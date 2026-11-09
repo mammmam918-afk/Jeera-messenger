@@ -101,6 +101,11 @@ button{cursor:pointer;border:0;background:none}
       </div>
       <div class="msgs" id="msgs"></div>
       <form class="comp" id="form">
+  <input id="mediaFile" type="file" accept="image/*,video/*" hidden>
+  <button type="button" id="mediaBtn">📎</button>
+  <input id="txt" placeholder="اكتب رسالة" autocomplete="off">
+  <button id="send" type="submit">إرسال</button>
+      </form>
         <input id="txt" placeholder="اكتب رسالة" autocomplete="off">
         <button id="send" type="submit">إرسال</button>
       </form>
@@ -110,6 +115,7 @@ button{cursor:pointer;border:0;background:none}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 // ⚠️ الصق هنا إعدادات Firebase بتاعة مشروع جيرة (نفس اللي في كود الموقع)
@@ -124,7 +130,8 @@ const firebaseConfig = {
 };
 
 const $ = id => document.getElementById(id);
-
+const auth = firebase.auth(), db = firebase.firestore();
+const storage = firebase.storage();
 try {
   if (!window.firebase) throw new Error('مكتبات Firebase لم يتم تحميلها. تأكد من اتصال الإنترنت.');
   firebase.initializeApp(firebaseConfig);
@@ -132,7 +139,6 @@ try {
   $('err').textContent = e.message || 'تعذر تشغيل Firebase. راجع إعدادات المشروع.';
   throw e;
 }
-const auth = firebase.auth(), db = firebase.firestore();
 let me = null, peer = null, users = [], unsubMsgs = null, unsubUsers = null, signup = false;
 
 const COLORS = ['#1b6ef3','#0f9d8a','#e0702b','#8a4fd6','#d6457a','#3a8f3a'];
@@ -270,7 +276,22 @@ function openChat(u){
       s.docs.forEach(d => {
         const m = d.data();
         const el = document.createElement('div'); el.className = 'm' + (m.from===me.uid ? ' me' : '');
-        el.append(document.createTextNode(m.text));
+        if (m.type === 'image' && m.url) {
+  const img = document.createElement('img');
+  img.src = m.url;
+  img.alt = 'صورة مرسلة';
+  img.style.cssText = 'max-width:220px;width:100%;border-radius:12px;display:block';
+  el.append(img);
+} else if (m.type === 'video' && m.url) {
+  const video = document.createElement('video');
+  video.src = m.url;
+  video.controls = true;
+  video.playsInline = true;
+  video.style.cssText = 'max-width:240px;width:100%;border-radius:12px';
+  el.append(video);
+} else {
+  el.append(document.createTextNode(m.text || ''));
+  }
         const tm = document.createElement('time');
         const dt = m.createdAt ? m.createdAt.toDate() : new Date();
         tm.textContent = dt.toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'});
@@ -281,6 +302,70 @@ function openChat(u){
   $('txt').focus();
 }
 $('back').onclick = () => { $('app').classList.remove('in') };
+ $('mediaBtn').onclick = () => {
+  if (!peer) return alert('اختار محادثة الأول');
+  $('mediaFile').click();
+};
+
+$('mediaFile').onchange = async function() {
+  const file = this.files[0];
+  if (!file || !peer || !me) return;
+
+  const isImage = file.type.startsWith('image/');
+  const isVideo = file.type.startsWith('video/');
+
+  if (!isImage && !isVideo) {
+    alert('اختار صورة أو فيديو فقط');
+    this.value = '';
+    return;
+  }
+
+  const maxSize = isImage ? 10 : 50;
+  if (file.size > maxSize * 1024 * 1024) {
+    alert('الحد الأقصى ' + maxSize + ' ميجابايت');
+    this.value = '';
+    return;
+  }
+
+  const btn = $('mediaBtn');
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  try {
+    const id = chatId(me.uid, peer.uid);
+    const path = 'chatMedia/' + id + '/' + Date.now() + '_' +
+      file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    const ref = storage.ref().child(path);
+    const result = await ref.put(file);
+    const url = await result.ref.getDownloadURL();
+    const type = isImage ? 'image' : 'video';
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+
+    await db.collection('chats').doc(id).collection('messages').add({
+      from: me.uid,
+      text: '',
+      type: type,
+      url: url,
+      fileName: file.name,
+      createdAt: ts
+    });
+
+    await db.collection('chats').doc(id).set({
+      members: [me.uid, peer.uid],
+      last: isImage ? '📷 صورة' : '🎥 فيديو',
+      updatedAt: ts
+    }, {merge: true});
+
+  } catch (e) {
+    console.error(e);
+    alert('فشل رفع الملف. راجع إعدادات Firebase Storage.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📎';
+    this.value = '';
+  }
+}; 
 
 $('form').onsubmit = async e => {
   e.preventDefault();
