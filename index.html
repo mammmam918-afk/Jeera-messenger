@@ -106,9 +106,7 @@ button{cursor:pointer;border:0;background:none}
   <input id="txt" placeholder="اكتب رسالة" autocomplete="off">
   <button id="send" type="submit">إرسال</button>
       </form>
-        <input id="txt" placeholder="اكتب رسالة" autocomplete="off">
-        <button id="send" type="submit">إرسال</button>
-      </form>
+      
     </div>
   </section>
 </div>
@@ -129,16 +127,20 @@ const firebaseConfig = {
   measurementId: "G-KRRS13ZQK8"
 };
 
-const $ = id => document.getElementById(id);
-const auth = firebase.auth(), db = firebase.firestore();
-const storage = firebase.storage();
+const $ = id => document.getElementById(id)
 try {
-  if (!window.firebase) throw new Error('مكتبات Firebase لم يتم تحميلها. تأكد من اتصال الإنترنت.');
-  firebase.initializeApp(firebaseConfig);
+  if (!window.firebase) throw new Error('مكتبات Firebase لم يتم تحميلها.');
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 } catch (e) {
-  $('err').textContent = e.message || 'تعذر تشغيل Firebase. راجع إعدادات المشروع.';
+  $('err').textContent = e.message || 'تعذر تشغيل Firebase.';
   throw e;
 }
+
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+let me = null, peer = null, users = [], unsubMsgs = null, unsubUsers = null, signup = false;  
 let me = null, peer = null, users = [], unsubMsgs = null, unsubUsers = null, signup = false;
 
 const COLORS = ['#1b6ef3','#0f9d8a','#e0702b','#8a4fd6','#d6457a','#3a8f3a'];
