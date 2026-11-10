@@ -141,7 +141,6 @@ const db = firebase.firestore();
 const storage = firebase.storage();
 
 let me = null, peer = null, users = [], unsubMsgs = null, unsubUsers = null, signup = false;  
-let me = null, peer = null, users = [], unsubMsgs = null, unsubUsers = null, signup = false;
 
 const COLORS = ['#1b6ef3','#0f9d8a','#e0702b','#8a4fd6','#d6457a','#3a8f3a'];
 const color = s => COLORS[[...s].reduce((a,c)=>a+c.charCodeAt(0),0) % COLORS.length];
